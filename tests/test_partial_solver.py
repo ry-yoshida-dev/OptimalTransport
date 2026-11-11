@@ -38,6 +38,22 @@ class TestPartialSolver(unittest.TestCase):
         plan = PartialSolver().solve(problem)
         self.assertAlmostEqual(plan.total_mass, 0.4)
 
+    def test_weights_beyond_the_simplex(self) -> None:
+        cost_matrix = np.array([[0.0, 1.0], [1.0, 0.0]])
+        problem = LinearTransportProblem(cost_matrix, [300.0, 300.0], [150.0, 250.0])
+        plan = PartialSolver(mass=100.0).solve(problem)
+        self.assertAlmostEqual(plan.total_mass, 100.0)
+        self.assertAlmostEqual(plan.cost, 0.0)
+        plan = PartialSolver().solve(problem)
+        np.testing.assert_allclose(plan.target_marginal, [150.0, 250.0])
+
+    def test_mass_equal_to_smaller_total(self) -> None:
+        # These weights make the scaled mass round above the smaller scaled total.
+        problem = LinearTransportProblem(np.ones((2, 2)), [0.1, 0.7], [4.1, 3.0])
+        mass = float(problem.source_weights.sum())
+        plan = PartialSolver(mass=mass).solve(problem)
+        self.assertAlmostEqual(plan.total_mass, mass)
+
     def test_mass_above_total_raises(self) -> None:
         problem = LinearTransportProblem(np.ones((2, 2)))
         with self.assertRaises(ValueError):

@@ -52,9 +52,22 @@ class PartialSolver(LinearTransportSolver):
             raise ValueError(
                 f"mass: {self.mass} exceeds the smaller total mass of the problem, {max_mass}"
             )
-        return ot.partial.partial_wasserstein(
-            problem.source_weights,
-            problem.target_weights,
-            problem.cost_matrix,
-            m=self.mass,
+        # POT accepts only marginals within the simplex; scaling both by the larger
+        # total keeps any mass unit and scales the plan back.
+        scale = float(max(problem.source_weights.sum(), problem.target_weights.sum()))
+        source_weights = problem.source_weights / scale
+        target_weights = problem.target_weights / scale
+        # Clip so that rounding in the scaling cannot push the mass above the
+        # smaller scaled total when the mass equals the smaller total.
+        mass = (
+            None
+            if self.mass is None
+            else min(
+                self.mass / scale,
+                float(min(source_weights.sum(), target_weights.sum())),
+            )
         )
+        plan = ot.partial.partial_wasserstein(
+            source_weights, target_weights, problem.cost_matrix, m=mass
+        )
+        return plan * scale
